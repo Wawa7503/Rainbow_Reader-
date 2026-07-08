@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rainbow Reader</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: {
+        'display': ['Nunito', 'sans-serif'],
+        'body': ['Quicksand', 'sans-serif'],
+      }
+    }
+  }
+}
+</script>
+<style>
+:root {
+  --night-deep: #0a0e27;
+  --night-mid: #121a3d;
+  --aurora-green: #00ff9d;
+  --aurora-blue: #00d4ff;
+  --aurora-purple: #b829dd;
+  --aurora-pink: #ff6b9d;
+  --aurora-yellow: #ffd93d;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Quicksand', sans-serif; background: var(--night-deep); color: white; overflow-x: hidden; }
+
+body, a, button, .book-card, .upload-zone {
+  cursor: none !important;
+}
+.magic-cursor {
+  width: 10px;
+  height: 10px;
+  background: #00ff9d;
+  border-radius: 50%;
+  position: fixed;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 99999;
+  box-shadow: 0 0 10px #00ff9d, 0 0 20px #ff6b9d;
+  transition: width 0.15s, height 0.15s, background 0.15s;
+}
+.magic-particle {
+  position: fixed;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 99998;
+  transform: translate(-50%, -50%);
+  animation: fadeOutParticle 0.6s cubic-bezier(0.1, 0.8, 0.2, 1) forwards;
+}
+@keyframes fadeOutParticle {
+  0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  100% { transform: translate(-50%, calc(-50% + 25px)) scale(0); opacity: 0; }
+}
+
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--night-deep); }
+::-webkit-scrollbar-thumb { background: linear-gradient(180deg, var(--aurora-green), var(--aurora-purple), var(--aurora-pink)); border-radius: 4px; }
+.aurora-bg { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+.aurora-wave { position: absolute; width: 200%; height: 100%; opacity: 0.4; filter: blur(60px); }
+.aurora-1 { background: linear-gradient(90deg, var(--aurora-green), var(--aurora-blue)); animation: aurora-flow-1 15s ease-in-out infinite; top: 20%; }
+.aurora-2 { background: linear-gradient(90deg, var(--aurora-purple), var(--aurora-pink)); animation: aurora-flow-2 18s ease-in-out infinite; top: 45%; }
+.aurora-3 { background: linear-gradient(90deg, var(--aurora-blue), var(--aurora-yellow)); animation: aurora-flow-3 20s ease-in-out infinite; top: 70%; }
+@keyframes aurora-flow-1 { 0%,100%{transform:translateX(-30%) skewY(-2deg)} 50%{transform:translateX(-70%) skewY(2deg)} }
+@keyframes aurora-flow-2 { 0%,100%{transform:translateX(-60%) skewY(1deg)} 50%{transform:translateX(-20%) skewY(-1deg)} }
+@keyframes aurora-flow-3 { 0%,100%{transform:translateX(-40%) skewY(-1deg)} 50%{transform:translateX(-80%) skewY(1deg)} }
+.star { position: absolute; width: 2px; height: 2px; background: white; border-radius: 50%; animation: twinkle 3s ease-in-out infinite; }
+@keyframes twinkle { 0%,100%{opacity:0.2;transform:scale(1)} 50%{opacity:1;transform:scale(1.5);box-shadow:0 0 6px white} }
+.glass-kids { background: rgba(255,255,255,0.05); backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px); border: 1px solid rgba(255,255,255,0.1); border-radius: 24px; }
+.glass-kids-strong { background: rgba(10,14,39,0.8); backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px); border: 1px solid rgba(255,255,255,0.12); }
+.book-card { transform-style: preserve-3d; transition: all 0.5s cubic-bezier(0.23,1,0.32,1); position: relative; }
+.book-card:hover { transform: translateY(-15px) rotateX(5deg) rotateY(-5deg) scale(1.02); }
+.book-card::before { content: ''; position: absolute; inset: -2px; border-radius: 26px; background: linear-gradient(135deg, var(--aurora-green), var(--aurora-pink), var(--aurora-purple)); z-index: -1; opacity: 0; transition: opacity 0.5s ease; }
+.book-card:hover::before { opacity: 0.6; filter: blur(15px); }
+.float-gentle { animation: float-gentle 6s ease-in-out infinite; }
+.float-gentle-delay { animation: float-gentle 6s ease-in-out 2s infinite; }
+.float-gentle-delay-2 { animation: float-gentle 6s ease-in-out 4s infinite; }
+@keyframes float-gentle { 0%,100%{transform:translateY(0) rotate(0deg)} 50%{transform:translateY(-20px) rotate(2deg)} }
+.mascotte { animation: mascotte-bounce 3s ease-in-out infinite; }
+@keyframes mascotte-bounce { 0%,100%{transform:translateY(0) scale(1)} 25%{transform:translateY(-10px) scale(1.05)} 50%{transform:translateY(0) scale(1)} 75%{transform:translateY(-5px) scale(1.02)} }
+.rainbow-text { background: linear-gradient(90deg, var(--aurora-green), var(--aurora-blue), var(--aurora-purple), var(--aurora-pink), var(--aurora-yellow)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.nav-link-kids { position: relative; font-weight: 600; transition: all 0.3s ease; }
+.nav-link-kids::after { content: ''; position: absolute; bottom: -4px; left: 50%; width: 0; height: 3px; border-radius: 2px; background: linear-gradient(90deg, var(--aurora-green), var(--aurora-purple)); transition: all 0.3s ease; transform: translateX(-50%); }
+.nav-link-kids:hover::after { width: 100%; }
+.nav-link-kids:hover { color: var(--aurora-green); }
+.btn-rainbow { background: linear-gradient(135deg, var(--aurora-green), var(--aurora-blue)); border: none; border-radius: 16px; color: white; font-weight: 700; font-family: 'Nunito'; transition: all 0.3s ease; position: relative; overflow: hidden; }
+.btn-rainbow:hover { transform: scale(1.05); box-shadow: 0 10px 40px rgba(0,255,157,0.3); }
+.btn-rainbow::before { content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent); transition: left 0.5s ease; }
+.btn-rainbow:hover::before { left: 100%; }
+.cart-badge { position: absolute; top: -6px; right: -6px; width: 22px; height: 22px; border-radius: 50%; background: linear-gradient(135deg, var(--aurora-pink), var(--aurora-purple)); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; font-family: 'Nunito'; animation: badge-pop 0.3s ease; }
+@keyframes badge-pop { 0%{transform:scale(0)} 50%{transform:scale(1.3)} 100%{transform:scale(1)} }
+.reveal-kids { opacity: 0; transform: translateY(40px); }
+#loader { position: fixed; inset: 0; background: var(--night-deep); z-index: 10000; display: flex; align-items: center; justify-content: center; flex-direction: column; transition: opacity 0.8s ease, visibility 0.8s ease; }
+.loader-star { width: 60px; height: 60px; position: relative; animation: loader-spin 2s linear infinite; }
+@keyframes loader-spin { to { transform: rotate(360deg); } }
+.age-badge { display: inline-flex; align-items: center; gap: 4px; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; font-family: 'Nunito'; }
+.age-3-5 { background: rgba(0,255,157,0.15); color: var(--aurora-green); border: 1px solid rgba(0,255,157,0.3); }
+.age-6-8 { background: rgba(0,212,255,0.15); color: var(--aurora-blue); border: 1px solid rgba(0,212,255,0.3); }
+.age-9-10 { background: rgba(184,41,221,0.15); color: var(--aurora-purple); border: 1px solid rgba(184,41,221,0.3); }
+@keyframes particle-burst { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate(var(--tx),var(--ty)) scale(0);opacity:0} }
+.particle { position: absolute; width: 8px; height: 8px; border-radius: 50%; pointer-events: none; animation: particle-burst 0.8s ease-out forwards; }
+.pdf-preview-modal { position: fixed; inset: 0; z-index: 200; display: none; align-items: center; justify-content: center; }
+.pdf-preview-modal.active { display: flex; }
+.pdf-preview-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(10px); }
+.pdf-preview-content { position: relative; z-index: 1; width: 95%; max-width: 900px; max-height: 90vh; display: flex; flex-direction: column; }
+.pdf-preview-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; background: rgba(10,14,39,0.95); border-bottom: 1px solid rgba(255,255,255,0.1); border-radius: 20px 20px 0 0; }
+.pdf-preview-body { flex: 1; overflow-y: auto; padding: 24px; background: rgba(10,14,39,0.95); border-radius: 0 0 20px 20px; }
+.pdf-page-canvas { display: block; margin: 0 auto 20px; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); max-width: 100%; }
+.pdf-page-number { text-align: center; color: rgba(255,255,255,0.5); font-size: 12px; margin-bottom: 20px; font-family: 'Nunito'; }
+.paypal-btn { background: linear-gradient(135deg, #0070ba, #005ea6); border: none; border-radius: 16px; color: white; font-weight: 700; font-family: 'Nunito'; padding: 14px 28px; font-size: 16px; cursor: pointer; transition: all 0.3s ease; display: inline-flex; align-items: center; gap: 10px; position: relative; overflow: hidden; }
+.paypal-btn:hover { transform: scale(1.05); box-shadow: 0 10px 40px rgba(0,112,186,0.4); }
+.paypal-btn::before { content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent); transition: left 0.5s ease; }
+.paypal-btn:hover::before { left: 100%; }
+.library-book-card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; overflow: hidden; transition: all 0.4s ease; }
+.library-book-card:hover { transform: translateY(-8px); border-color: rgba(0,255,157,0.3); box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
+.library-book-cover { width: 100%; aspect-ratio: 3/4; object-fit: cover; border-radius: 12px; }
+.library-progress-bar { height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; }
+.library-progress-fill { height: 100%; background: linear-gradient(90deg, var(--aurora-green), var(--aurora-blue)); border-radius: 3px; transition: width 0.5s ease; }
+.no-download { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
+.no-download img, .no-download canvas { pointer-events: none; -webkit-user-drag: none; }
+.feature-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 24px; padding: 40px 32px; transition: all 0.4s cubic-bezier(0.23,1,0.32,1); position: relative; overflow: hidden; }
+.feature-card::before { content: ''; position: absolute; inset: 0; border-radius: 24px; background: linear-gradient(135deg, rgba(0,255,157,0.1), rgba(0,212,255,0.1), rgba(184,41,221,0.1)); opacity: 0; transition: opacity 0.4s ease; z-index: 0; }
+.feature-card:hover::before { opacity: 1; }
+.feature-card:hover { transform: translateY(-12px); border-color: rgba(0,255,157,0.25); box-shadow: 0 25px 50px rgba(0,0,0,0.3); }
+.feature-card > * { position: relative; z-index: 1; }
+.feature-icon { width: 64px; height: 64px; border-radius: 20px; display: flex; align-items: center; justify-content: center; margin-bottom: 24px; font-size: 28px; }
+.about-image-wrapper { position: relative; border-radius: 32px; overflow: hidden; }
+.about-image-wrapper::before { content: ''; position: absolute; inset: -2px; border-radius: 34px; background: linear-gradient(135deg, var(--aurora-green), var(--aurora-blue), var(--aurora-purple), var(--aurora-pink)); z-index: -1; opacity: 0.5; }
+.about-image-wrapper img { width: 100%; border-radius: 32px; display: block; }
+.about-badge { display: inline-flex; align-items: center; gap: 8px; padding: 8px 20px; border-radius: 100px; background: rgba(0,255,157,0.1); border: 1px solid rgba(0,255,157,0.25); color: var(--aurora-green); font-size: 14px; font-weight: 700; font-family: 'Nunito'; }
+@media (max-width: 768px) { .hero-title-kids { font-size: 2.5rem !important; } }
+</style>
+</head>
+<body class="antialiased">
+
+<div class="magic-cursor" id="magicCursor"></div>
+
+<div id="loader">
+  <div class="loader-star">
+    <svg viewBox="0 0 60 60" class="w-full h-full">
+      <defs><linearGradient id="starGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#00ff9d"/><stop offset="50%" style="stop-color:#00d4ff"/><stop offset="100%" style="stop-color:#b829dd"/></linearGradient></defs>
+      <path d="M30 5 L36 22 L55 22 L40 33 L46 50 L30 40 L14 50 L20 33 L5 22 L24 22 Z" fill="url(#starGrad)"/>
+    </svg>
+  </div>
+  <p class="mt-4 font-display text-xl font-bold tracking-wide">Rainbow Reader</p>
+  <p class="mt-2 text-sm text-white/40">Loading magical books...</p>
+</div>
+
+<div class="aurora-bg">
+  <div class="aurora-wave aurora-1"></div>
+  <div class="aurora-wave aurora-2"></div>
+  <div class="aurora-wave aurora-3"></div>
+</div>
+
+<div id="stars-container" class="fixed inset-0 z-0 pointer-events-none"></div>
+
+<nav id="navbar" class="fixed top-0 left-0 right-0 z-50 transition-all duration-500">
+  <div class="max-w-7xl mx-auto px-6 py-4">
+    <div class="flex items-center justify-between">
+      <a href="#" class="flex items-center gap-3 group" onclick="showPage('home'); return false;">
+        <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#00ff9d] via-[#00d4ff] to-[#b829dd] flex items-center justify-center relative overflow-hidden mascotte">
+          <svg class="w-7 h-7 text-white relative z-10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        </div>
+        <span class="font-display text-2xl font-bold tracking-tight"><span class="rainbow-text">Rainbow</span> <span class="text-white">Reader</span></span>
+      </a>
+      <div class="hidden md:flex items-center gap-8">
+        <a href="#books" class="nav-link-kids text-sm text-white/70">Books</a>
+        <a href="#features" class="nav-link-kids text-sm text-white/70">Features</a>
+        <a href="#about" class="nav-link-kids text-sm text-white/70">About</a>
+        <a href="#library" class="nav-link-kids text-sm text-white/70" onclick="showLibrary(); return false;">My Library</a>
+      </div>
+      <div class="flex items-center gap-4">
+        <button id="cart-btn" class="relative p-3 rounded-2xl glass-kids hover:bg-white/10 transition-all group">
+          <svg class="w-6 h-6 text-white/70 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+          <span id="cart-count" class="cart-badge hidden">0</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<div id="cart-sidebar" class="fixed top-0 right-0 h-full w-full max-w-md z-[60] transform translate-x-full transition-transform duration-500 ease-out">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeCart()"></div>
+  <div class="absolute right-0 top-0 h-full w-96 glass-kids-strong p-6 flex flex-col shadow-2xl shadow-black/50">
+    <div class="flex items-center justify-between mb-6">
+      <h3 class="font-display text-2xl font-bold rainbow-text">Your Cart</h3>
+      <button onclick="closeCart()" class="p-2 rounded-xl hover:bg-white/10 transition-colors">
+        <svg class="w-6 h-6 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div id="cart-items" class="flex-1 overflow-y-auto space-y-4 pr-2">
+      <p class="text-white/40 text-center py-12 font-body">Your cart is empty. Add some magical books!</p>
+    </div>
+    <div class="border-t border-white/10 pt-4 mt-4">
+      <div class="flex justify-between items-center mb-4">
+        <span class="text-white/60 font-body">Total</span>
+        <span id="cart-total" class="font-display text-2xl font-bold text-white">$0.00</span>
+      </div>
+      <button onclick="initPayPalCheckout()" class="w-full paypal-btn py-4 text-lg font-display font-bold flex items-center justify-center gap-2">
+        <svg class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor"><path d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.01 1.15 1.304 2.42 1.012 4.287-.023.143-.047.288-.077.437-.983 5.05-4.349 6.797-8.647 6.797h-2.19c-.524 0-.968.382-1.05.9l-1.12 7.106zm14.146-14.42a3.35 3.35 0 0 0-.607-.541c1.218-3.714-.36-5.553-2.423-6.796-2.023-1.219-4.795-1.37-7.328-1.37H5.998c-1.524 0-2.83 1.11-3.07 2.616L.01 20.707a1.592 1.592 0 0 0 1.57 1.87h4.607a1.592 1.592 0 0 0 1.57-1.37l.37-2.343h2.11c4.356 0 7.898-1.794 8.91-6.798.1-.51.183-1.01.246-1.49z"/></svg>
+        Pay with PayPal
+      </button>
+    </div>
+  </div>
+</div>
+
+<section id="hero" class="relative min-h-screen flex items-center pt-20 overflow-hidden">
+  <div class="max-w-7xl mx-auto px-6 w-full relative z-10">
+    <div class="grid lg:grid-cols-2 gap-12 items-center">
+      <div class="text-center lg:text-left">
+        <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-kids mb-6 float-gentle">
+          <span class="w-2 h-2 rounded-full bg-[#00ff9d] animate-pulse"></span>
+          <span class="text-sm font-body text-white/70">Colorful Learning for Kids</span>
+        </div>
+        <h1 class="hero-title-kids font-display text-5xl md:text-7xl font-black leading-tight mb-6">
+          Discover <span class="rainbow-text">Magical</span><br>
+          Stories That<br>
+          <span class="text-[#00d4ff]">Learn With You</span>
+        </h1>
+        <p class="text-lg text-white/60 font-body max-w-lg mx-auto lg:mx-0 mb-8 leading-relaxed">
+          Rainbow Reader creates beautiful coloring books, kindergarten workbooks, and toddler activity books that spark creativity and joy in every child.
+        </p>
+        <div class="flex flex-wrap gap-4 justify-center lg:justify-start">
+          <a href="#books" class="btn-rainbow px-8 py-4 text-lg font-display font-bold inline-flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+            Browse Books
+          </a>
+          <a href="#features" class="px-8 py-4 rounded-2xl glass-kids text-white font-display font-bold hover:bg-white/10 transition-all inline-flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            Learn More
+          </a>
+        </div>
+      </div>
+
+      <div class="relative hidden lg:block">
+        <div class="absolute inset-0 bg-gradient-to-br from-[#00ff9d]/20 via-[#00d4ff]/20 to-[#b829dd]/20 rounded-full blur-3xl animate-pulse"></div>
+        <div class="relative z-10 float-gentle">
+          <div class="w-full rounded-3xl shadow-2xl shadow-black/40 border border-white/10 overflow-hidden" style="max-height: 600px; background: linear-gradient(135deg, #1a1e3d, #0a0e27);">
+            <svg viewBox="0 0 400 600" class="w-full">
+              <rect width="400" height="600" fill="#1a1e3d"/>
+              <rect x="50" y="100" width="40" height="300" rx="6" fill="#ff6b6b"/>
+              <polygon points="50,100 70,60 90,100" fill="#ff6b6b"/>
+              <rect x="50" y="400" width="40" height="40" rx="4" fill="#ff4757"/>
+              <rect x="110" y="80" width="40" height="300" rx="6" fill="#ffd93d"/>
+              <polygon points="110,80 130,40 150,80" fill="#ffd93d"/>
+              <rect x="110" y="380" width="40" height="40" rx="4" fill="#ffa502"/>
+              <rect x="170" y="120" width="40" height="300" rx="6" fill="#00ff9d"/>
+              <polygon points="170,120 190,80 210,120" fill="#00ff9d"/>
+              <rect x="170" y="420" width="40" height="40" rx="4" fill="#00d4ff"/>
+              <rect x="230" y="90" width="40" height="300" rx="6" fill="#00d4ff"/>
+              <polygon points="230,90 250,50 270,90" fill="#00d4ff"/>
+              <rect x="230" y="390" width="40" height="40" rx="4" fill="#b829dd"/>
+              <rect x="290" y="110" width="40" height="300" rx="6" fill="#b829dd"/>
+              <polygon points="290,110 310,70 330,110" fill="#b829dd"/>
+              <rect x="290" y="410" width="40" height="40" rx="4" fill="#ff6b9d"/>
+              <circle cx="70" cy="500" r="8" fill="#ffd93d" opacity="0.6"/>
+              <circle cx="150" cy="520" r="6" fill="#00ff9d" opacity="0.6"/>
+              <circle cx="210" cy="490" r="10" fill="#00d4ff" opacity="0.6"/>
+              <circle cx="270" cy="510" r="6" fill="#b829dd" opacity="0.6"/>
+              <circle cx="330" cy="530" r="8" fill="#ff6b9d" opacity="0.6"/>
+              <text x="200" y="40" font-size="24" font-weight="bold" fill="#fff" text-anchor="middle" font-family="Arial" opacity="0.3">COLOR</text>
+            </svg>
+          </div>
+          <div class="absolute -bottom-4 -left-4 glass-kids p-4 rounded-2xl float-gentle-delay">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-[#00ff9d] to-[#00d4ff] flex items-center justify-center">
+                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+              </div>
+              <div>
+                <p class="text-xs text-white/50 font-body">Colorful Fun</p>
+                <p class="text-sm font-bold font-display text-white">Creative Activities</p>
+              </div>
+            </div>
+          </div>
+          <div class="absolute -top-4 -right-4 glass-kids p-4 rounded-2xl float-gentle-delay-2">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-[#ff6b9d] to-[#b829dd] flex items-center justify-center">
+                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
+              </div>
+              <div>
+                <p class="text-xs text-white/50 font-body">Fun to Print</p>
+                <p class="text-sm font-bold font-display text-white">Instant Download</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<main id="main-content" class="max-w-7xl mx-auto px-6 py-12 relative z-10">
+
+  <div id="page-home" class="space-y-24">
+    <section id="books" class="scroll-mt-28">
+      <div class="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6 reveal-kids">
+        <div>
+          <h2 class="font-display text-3xl md:text-4xl font-bold mb-2">Our <span class="rainbow-text">Magical</span> Collection</h2>
+          <p class="text-white/50 font-body text-sm">Choose the perfect books for your child's age and interests.</p>
+        </div>
+
+      </div>
+
+      <div id="books-grid" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
+      </div>
+    </section>
+
+    <section id="features" class="scroll-mt-28">
+      <div class="text-center mb-14 reveal-kids">
+        <h2 class="font-display text-3xl md:text-5xl font-bold mb-4">Why Choose <span class="rainbow-text">Rainbow Reader</span></h2>
+      </div>
+
+      <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 reveal-kids">
+        <div class="feature-card text-center">
+          <div class="feature-icon bg-gradient-to-br from-[#00ff9d]/20 to-[#00ff9d]/5 mx-auto">
+            <svg class="w-8 h-8 text-[#00ff9d]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+          </div>
+          <h3 class="font-display text-lg font-bold text-white mb-2">Educational Books</h3>
+          <p class="text-white/50 text-sm font-body leading-relaxed">Every book is designed to stimulate learning while having fun, with age-appropriate activities.</p>
+        </div>
+
+        <div class="feature-card text-center">
+          <div class="feature-icon bg-gradient-to-br from-[#00d4ff]/20 to-[#00d4ff]/5 mx-auto">
+            <svg class="w-8 h-8 text-[#00d4ff]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
+          </div>
+          <h3 class="font-display text-lg font-bold text-white mb-2">Infinite Creativity</h3>
+          <p class="text-white/50 text-sm font-body leading-relaxed">Hundreds of coloring pages and activities to unleash your child's imagination without limits.</p>
+        </div>
+
+        <div class="feature-card text-center">
+          <div class="feature-icon bg-gradient-to-br from-[#b829dd]/20 to-[#b829dd]/5 mx-auto">
+            <svg class="w-8 h-8 text-[#b829dd]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          </div>
+          <h3 class="font-display text-lg font-bold text-white mb-2">Instant Download</h3>
+          <p class="text-white/50 text-sm font-body leading-relaxed">Receive your books immediately after purchase. Print them as many times as you like.</p>
+        </div>
+
+        <div class="feature-card text-center">
+          <div class="feature-icon bg-gradient-to-br from-[#ff6b9d]/20 to-[#ff6b9d]/5 mx-auto">
+            <svg class="w-8 h-8 text-[#ff6b9d]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+          </div>
+          <h3 class="font-display text-lg font-bold text-white mb-2">Safe Content</h3>
+          <p class="text-white/50 text-sm font-body leading-relaxed">All our content is verified and child-friendly, for worry-free learning.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="about" class="scroll-mt-28">
+      <div class="grid lg:grid-cols-2 gap-14 items-center">
+        <div class="reveal-kids order-2 lg:order-1">
+          <div class="about-image-wrapper">
+            <img src="https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=800&q=80" alt="Rainbow Reader - A magical learning universe for children" class="w-full">
+            <div class="absolute bottom-6 left-6 right-6 glass-kids p-4 rounded-2xl">
+              <div class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-[#00ff9d] to-[#00d4ff] flex items-center justify-center flex-shrink-0">
+                  <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                <div>
+                  <p class="font-display font-bold text-white text-sm">Over 10,000 delighted families</p>
+                  <p class="text-white/50 text-xs font-body">Join the Rainbow Reader adventure today!</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="order-1 lg:order-2 reveal-kids">
+          <div class="about-badge mb-6">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            About Rainbow Reader
+          </div>
+          <h2 class="font-display text-3xl md:text-4xl font-bold mb-6 leading-tight">
+            A <span class="rainbow-text">Magical</span> World of Learning for Your Kids
+          </h2>
+          <div class="space-y-4 text-white/60 font-body leading-relaxed mb-8">
+            <p>
+              Rainbow Reader was born from a simple passion: making learning a magical adventure for every child. We believe creativity and imagination are the keys to harmonious development.
+            </p>
+            <p>
+              Our collection of coloring books, kindergarten workbooks, and activity books is carefully crafted by passionate educators and illustrators. Every page is an invitation to explore, learn, and have fun.
+            </p>
+            <p>
+              Whether your little artist loves dinosaurs, princesses, or animals, Rainbow Reader has the perfect book to spark their curiosity and joy of discovery. Download, print, and let the magic happen!
+            </p>
+          </div>
+
+          <div class="flex flex-wrap gap-6 mb-8">
+            <div class="text-center">
+              <p class="font-display text-3xl font-extrabold rainbow-text">Books</p>
+              <p class="text-white/50 text-xs font-body">Collection</p>
+            </div>
+            <div class="w-px bg-white/10"></div>
+            <div class="text-center">
+              <p class="font-display text-3xl font-extrabold rainbow-text">3-10</p>
+              <p class="text-white/50 text-xs font-body">Ages Covered</p>
+            </div>
+            <div class="w-px bg-white/10"></div>
+            <div class="text-center">
+              <p class="font-display text-3xl font-extrabold rainbow-text">100%</p>
+              <p class="text-white/50 text-xs font-body">Fun</p>
+            </div>
+          </div>
+
+          <a href="#books" class="btn-rainbow px-8 py-4 text-lg font-display font-bold inline-flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+            Explore the Collection
+          </a>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div id="page-library" class="hidden space-y-8 pt-12">
+    <h2 class="font-display text-3xl font-bold rainbow-text">My Magical Library</h2>
+    <div id="library-grid" class="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+    </div>
+  </div>
+
+  <!-- Admin View -->
+  <div id="page-admin" class="hidden max-w-2xl mx-auto pt-12">
+    <div class="glass-kids p-8 space-y-6">
+      <div class="flex justify-between items-center">
+        <h2 class="font-display text-2xl font-bold rainbow-text">Add a New Book</h2>
+        <button onclick="showPage('home')" class="text-xs text-white/50 hover:text-white font-body">Back</button>
+      </div>
+      <form id="add-book-form" onsubmit="handleBookSubmit(event)" class="space-y-4 font-body text-sm">
+        <div>
+          <label class="block text-white/60 mb-2">Book Title</label>
+          <input type="text" id="book-title" required class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#00ff9d]">
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-white/60 mb-2">Price ($)</label>
+            <input type="number" id="book-price" step="0.01" required class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#00ff9d]">
+          </div>
+          <div>
+            <label class="block text-white/60 mb-2">Age Range</label>
+            <select id="book-age" class="w-full bg-[#121a3d] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#00ff9d]">
+              <option value="3-5">3 - 5 years</option>
+              <option value="6-8">6 - 8 years</option>
+              <option value="9-10">9 - 10 years</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="block text-white/60 mb-2">Category</label>
+          <select id="book-category" class="w-full bg-[#121a3d] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#00ff9d]">
+            <option value="coloring">Coloring</option>
+            <option value="kindergarten">Kindergarten</option>
+            <option value="activity">Activity Book</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-white/60 mb-2">Description</label>
+          <textarea id="book-desc" rows="3" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#00ff9d]"></textarea>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-white/60 mb-2">Cover (Image)</label>
+            <div class="upload-zone" onclick="document.getElementById('file-cover').click()">
+              <span class="text-xs text-white/40">Choose Image</span>
+              <input type="file" id="file-cover" accept="image/*" class="hidden" onchange="updateUploadLabel(this)">
+            </div>
+          </div>
+          <div>
+            <label class="block text-white/60 mb-2">Full PDF File</label>
+            <div class="upload-zone" onclick="document.getElementById('file-pdf').click()">
+              <span class="text-xs text-white/40">Choose PDF</span>
+              <input type="file" id="file-pdf" accept=".pdf" class="hidden" onchange="updateUploadLabel(this)">
+            </div>
+          </div>
+        </div>
+        <button type="submit" class="w-full btn-rainbow py-4 font-display font-bold text-base mt-4">Publish Book</button>
+      </form>
+    </div>
+  </div>
+</main>
+
+<div id="preview-modal" class="pdf-preview-modal">
+  <div class="pdf-preview-backdrop" onclick="closePreview()"></div>
+  <div class="pdf-preview-content glass-kids-strong">
+    <div class="pdf-preview-header">
+      <h4 id="preview-title" class="font-display text-lg font-bold text-white">Book Preview</h4>
+      <button onclick="closePreview()" class="p-2 rounded-xl hover:bg-white/10 transition-colors">
+        <svg class="w-6 h-6 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div id="preview-body" class="pdf-preview-body no-download">
+    </div>
+  </div>
+</div>
+
+<footer class="border-t border-white/5 bg-black/20 py-8 text-center text-xs text-white/40 font-body relative z-10">
+  <p>&copy; 2026 Rainbow Reader. All rights reserved.</p>
+</footer>
+<script>
+
+const defaultBooks = [
+  { id: "abc-3d", title: "ABC 3D Learning Cards", description: "An interactive and fun way to learn the alphabet with colorful and captivating illustrations.", price: 4.99, age: "3-5", category: "kindergarten", cover: "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "dino-friends", title: "Dino Friends - Coloring Book", description: "Explore a joyful prehistoric world filled with friendly dinosaurs to color endlessly.", price: 5.99, age: "3-5", category: "coloring", cover: "https://images.unsplash.com/photo-1569336415962-a4bd9f69cd83?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "toddler-activity", title: "Toddler Activity Book Premium", description: "Simple mazes, shape games, and logic exercises adapted for toddler development.", price: 6.99, age: "3-5", category: "activity", cover: "https://images.unsplash.com/photo-1606326608606-aa0b62935f2b?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "girl-coloring", title: "Kids Coloring Book - Girls Edition", description: "A magical universe filled with fairy-tale inspired adventures for little artists.", price: 4.50, age: "6-8", category: "coloring", cover: "https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "house-colors", title: "Creative House & Colors", description: "Imagine, draw, and paint your dream house through fun guided workshops.", price: 3.99, age: "6-8", category: "activity", cover: "https://images.unsplash.com/photo-1519751138087-5bf79df62d5b?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "kids-books-pack", title: "Kindergarten Educational Books Pack", description: "A complete and progressive suite covering writing, counting, and sensory awakening.", price: 9.99, age: "3-5", category: "kindergarten", cover: "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "ocean-adventure", title: "Ocean Adventure Coloring Book", description: "Dive into the deep blue sea and color friendly dolphins, whales, and tropical fish.", price: 4.99, age: "3-5", category: "coloring", cover: "https://images.unsplash.com/photo-1582967788606-a171f1080ca8?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "space-explorers", title: "Space Explorers Activity Book", description: "Blast off to the stars with rocket ships, planets, and alien friends to discover.", price: 5.49, age: "6-8", category: "activity", cover: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "farm-friends", title: "Farm Friends Coloring Book", description: "Visit the countryside and color cows, chickens, pigs, and happy farmers.", price: 3.99, age: "3-5", category: "coloring", cover: "https://images.unsplash.com/photo-1500595046743-cd271d694d30?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "jungle-journey", title: "Jungle Journey Activity Book", description: "Swing through the jungle with monkeys, parrots, and hidden treasure maps.", price: 5.99, age: "6-8", category: "activity", cover: "https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "number-ninja", title: "Number Ninja - Math Fun", description: "Master numbers 1 to 20 with counting games, dot-to-dot, and number tracing.", price: 4.49, age: "3-5", category: "kindergarten", cover: "https://images.unsplash.com/photo-1509228468518-180dd4864904?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "princess-palace", title: "Princess Palace Coloring Book", description: "Enter a royal world of castles, crowns, and magical princesses to color.", price: 4.99, age: "6-8", category: "coloring", cover: "https://images.unsplash.com/photo-1535581652167-3d6693c03aab?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "super-heroes", title: "Super Heroes Activity Book", description: "Save the day with action-packed puzzles, mazes, and hero coloring pages.", price: 5.49, age: "6-8", category: "activity", cover: "https://images.unsplash.com/photo-1635805737707-575885ab0820?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "animal-alphabet", title: "Animal Alphabet Book", description: "Learn A to Z with adorable animals — one letter, one furry friend at a time.", price: 3.99, age: "3-5", category: "kindergarten", cover: "https://images.unsplash.com/photo-1474511320723-9a56873571b7?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "fairy-garden", title: "Fairy Garden Coloring Book", description: "Wander through enchanted gardens with fairies, butterflies, and glowing mushrooms.", price: 4.49, age: "6-8", category: "coloring", cover: "https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "dinosaur-dig", title: "Dinosaur Dig Activity Book", description: "Uncover fossils, solve dino puzzles, and build your own prehistoric world.", price: 5.99, age: "6-8", category: "activity", cover: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "shapes-stars", title: "Shapes & Stars Workbook", description: "Circles, squares, triangles, and stars — learn every shape with bright activities.", price: 3.49, age: "3-5", category: "kindergarten", cover: "https://images.unsplash.com/photo-1513542789411-b6a5d4f31634?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "robot-rampage", title: "Robot Rampage Coloring Book", description: "Build and color cool robots, flying drones, and futuristic cities.", price: 4.99, age: "6-8", category: "coloring", cover: "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "magic-mazes", title: "Magic Mazes Activity Book", description: "Navigate through tricky mazes, find hidden paths, and solve brain teasers.", price: 4.49, age: "6-8", category: "activity", cover: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "puppy-parade", title: "Puppy Parade Coloring Book", description: "Color the cutest puppies, playful dogs, and their fun adventures in the park.", price: 3.99, age: "3-5", category: "coloring", cover: "https://images.unsplash.com/photo-1587300003388-59208cc962cb?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "counting-castle", title: "Counting Castle Workbook", description: "Count dragons, knights, and treasures in this medieval math adventure.", price: 4.49, age: "3-5", category: "kindergarten", cover: "https://images.unsplash.com/photo-1598550476439-6847785fcea6?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "underwater-world", title: "Underwater World Activity Book", description: "Explore coral reefs, meet sea turtles, and solve ocean puzzles.", price: 5.49, age: "6-8", category: "activity", cover: "https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "butterfly-dreams", title: "Butterfly Dreams Coloring Book", description: "A garden of beautiful butterflies, flowers, and rainbow skies to color.", price: 4.49, age: "6-8", category: "coloring", cover: "https://images.unsplash.com/photo-1558642452-9d2a7deb7f62?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "train-tracks", title: "Train Tracks Activity Book", description: "All aboard! Build train routes, solve rail puzzles, and color locomotives.", price: 4.99, age: "3-5", category: "activity", cover: "https://images.unsplash.com/photo-1474487548417-781cb71495f3?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "pirate-island", title: "Pirate Island Coloring Book", description: "Sail the seven seas, find treasure maps, and color swashbuckling pirates.", price: 5.49, age: "6-8", category: "coloring", cover: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "weather-wonders", title: "Weather Wonders Workbook", description: "Learn about sun, rain, rainbows, and snow with fun science activities.", price: 3.99, age: "3-5", category: "kindergarten", cover: "https://images.unsplash.com/photo-1527482797697-8795b05a13fe?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "circus-fun", title: "Circus Fun Activity Book", description: "Juggling clowns, acrobatic animals, and big-top puzzles await inside.", price: 5.49, age: "6-8", category: "activity", cover: "https://images.unsplash.com/photo-1508804185872-d7badad00f7d?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "forest-friends", title: "Forest Friends Coloring Book", description: "Color deer, foxes, owls, and squirrels in their cozy woodland homes.", price: 4.49, age: "3-5", category: "coloring", cover: "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "space-numbers", title: "Space Numbers Workbook", description: "Count stars, planets, and rockets in this out-of-this-world math book.", price: 3.99, age: "3-5", category: "kindergarten", cover: "https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "dragon-den", title: "Dragon Den Activity Book", description: "Tame dragons, solve fire-breathing puzzles, and explore mystical caves.", price: 5.99, age: "6-8", category: "activity", cover: "https://images.unsplash.com/photo-1577493340887-b7bfff550145?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "candy-land", title: "Candy Land Coloring Book", description: "A sweet world of lollipops, gumdrops, and chocolate rivers to color.", price: 4.49, age: "3-5", category: "coloring", cover: "https://images.unsplash.com/photo-1499195333224-3ce974eecb47?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "music-magic", title: "Music Magic Coloring Book", description: "Color musical notes, instruments, and dancing characters in harmony.", price: 4.49, age: "6-8", category: "coloring", cover: "https://images.unsplash.com/photo-1511379938547-c1f69419868d?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "winter-wonderland", title: "Winter Wonderland Activity Book", description: "Build snowmen, solve ice puzzles, and color cozy winter scenes.", price: 4.99, age: "3-5", category: "activity", cover: "https://images.unsplash.com/photo-1483664852095-d6cc6870705d?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "safari-adventure", title: "Safari Adventure Coloring Book", description: "Spot lions, elephants, zebras, and giraffes on an African safari.", price: 5.49, age: "6-8", category: "coloring", cover: "https://images.unsplash.com/photo-1547471080-7cc2caa01a7e?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "abc-animals", title: "ABC Animals Workbook", description: "A is for Alligator, B is for Bear — learn letters with animal friends.", price: 3.99, age: "3-5", category: "kindergarten", cover: "https://images.unsplash.com/photo-1535083783855-76ae62b2914e?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "mermaid-lagoon", title: "Mermaid Lagoon Activity Book", description: "Swim with mermaids, collect seashells, and solve underwater riddles.", price: 5.49, age: "6-8", category: "activity", cover: "https://images.unsplash.com/photo-1518837695005-2083093ee35b?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "rainbow-skies", title: "Rainbow Skies Coloring Book", description: "Paint the sky with every color of the rainbow and fluffy clouds.", price: 3.99, age: "3-5", category: "coloring", cover: "https://images.unsplash.com/photo-1495616811223-4d98c6e9d869?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "detective-club", title: "Detective Club Activity Book", description: "Solve mysteries, find clues, and crack the case with detective puzzles.", price: 5.99, age: "6-8", category: "activity", cover: "https://images.unsplash.com/photo-1453873419266-ec650dbcd4f1?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "pet-parade", title: "Pet Parade Coloring Book", description: "Cats, dogs, hamsters, and bunnies — all your favorite pets to color.", price: 4.49, age: "3-5", category: "coloring", cover: "https://images.unsplash.com/photo-1425082661705-1834bfd09dca?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "monster-mash", title: "Monster Mash Activity Book", description: "Friendly monsters, silly puzzles, and spooky fun for brave little ones.", price: 4.99, age: "6-8", category: "activity", cover: "https://images.unsplash.com/photo-1509281373149-e957c6296406?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "garden-grow", title: "Garden Grow Workbook", description: "Plant seeds, water flowers, and learn about nature with gardening activities.", price: 3.99, age: "3-5", category: "kindergarten", cover: "https://images.unsplash.com/photo-1416879595882-3373a0480b5b?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "castle-kingdom", title: "Castle Kingdom Coloring Book", description: "Knights, dragons, and royal castles in a medieval fantasy world.", price: 5.49, age: "6-8", category: "coloring", cover: "https://images.unsplash.com/photo-1598550476439-6847785fcea6?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "birthday-party", title: "Birthday Party Activity Book", description: "Plan the perfect party with cake decorating, balloon games, and fun puzzles.", price: 4.49, age: "3-5", category: "activity", cover: "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "unicorn-dreams", title: "Unicorn Dreams Coloring Book", description: "Gallop through rainbow fields with magical unicorns and sparkling stars.", price: 4.99, age: "6-8", category: "coloring", cover: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "time-travel", title: "Time Travel Activity Book", description: "Journey through history — dinosaurs, pyramids, and future cities await.", price: 5.99, age: "6-8", category: "activity", cover: "https://images.unsplash.com/photo-1501139083538-0139583c060f?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "bedtime-stories", title: "Bedtime Stories Workbook", description: "Calm activities, gentle puzzles, and sleepy-time tracing before bed.", price: 3.99, age: "3-5", category: "kindergarten", cover: "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "camping-trip", title: "Camping Trip Coloring Book", description: "Tents, campfires, s'mores, and starry nights in the great outdoors.", price: 4.49, age: "6-8", category: "coloring", cover: "https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "magic-tricks", title: "Magic Tricks Activity Book", description: "Learn simple magic tricks, card puzzles, and illusion activities.", price: 5.49, age: "6-8", category: "activity", cover: "https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "fruit-fiesta", title: "Fruit Fiesta Coloring Book", description: "A juicy collection of apples, bananas, strawberries, and tropical fruits.", price: 3.99, age: "3-5", category: "coloring", cover: "https://images.unsplash.com/photo-1619566636858-adf3ef46400b?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "writing-wizard", title: "Writing Wizard Workbook", description: "Trace letters, practice words, and become a handwriting master.", price: 4.49, age: "3-5", category: "kindergarten", cover: "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "ninja-adventure", title: "Ninja Adventure Activity Book", description: "Stealth missions, dojo puzzles, and ninja star challenges.", price: 5.99, age: "6-8", category: "activity", cover: "https://images.unsplash.com/photo-1535581652167-3d6693c03aab?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "halloween-haunt", title: "Halloween Haunt Coloring Book", description: "Jack-o'-lanterns, witches, and friendly ghosts for spooky fun.", price: 4.49, age: "6-8", category: "coloring", cover: "https://images.unsplash.com/photo-1509281373149-e957c6296406?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "pattern-play", title: "Pattern Play Workbook", description: "Spot patterns, complete sequences, and boost logical thinking skills.", price: 3.99, age: "3-5", category: "kindergarten", cover: "https://images.unsplash.com/photo-1509228468518-180dd4864904?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "construction-zone", title: "Construction Zone Activity Book", description: "Bulldozers, cranes, and building site puzzles for little engineers.", price: 5.49, age: "6-8", category: "activity", cover: "https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "spring-blossoms", title: "Spring Blossoms Coloring Book", description: "Cherry blossoms, baby animals, and fresh spring scenes to color.", price: 4.49, age: "3-5", category: "coloring", cover: "https://images.unsplash.com/photo-1490750967868-88aa2f44cbbf?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "opposites-attract", title: "Opposites Attract Workbook", description: "Big and small, hot and cold — learn opposites through fun activities.", price: 3.99, age: "3-5", category: "kindergarten", cover: "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=600&q=80", pdfUrl: "" },
+  { id: "treasure-hunt", title: "Treasure Hunt Activity Book", description: "Follow maps, decode clues, and find hidden treasure chests.", price: 5.99, age: "6-8", category: "activity", cover: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=600&q=80", pdfUrl: "" }
+];
+
+
+let books = JSON.parse(localStorage.getItem('rainbow_reader_books')) || defaultBooks;
+
+let cart = [];
+let currentCategoryFilter = 'all';
+
+const magicCursor = document.getElementById('magicCursor');
+
+document.addEventListener('mousemove', (e) => {
+  magicCursor.style.left = e.clientX + 'px';
+  magicCursor.style.top = e.clientY + 'px';
+  createMagicParticle(e.clientX, e.clientY);
+});
+
+function bindCursorInteractions() {
+  document.querySelectorAll('a, button, .book-card, select, input, textarea, .upload-zone').forEach(el => {
+    el.addEventListener('mouseenter', () => {
+      magicCursor.style.transform = 'translate(-50%, -50%) scale(1.8)';
+      magicCursor.style.background = '#ff6b9d';
+    });
+    el.addEventListener('mouseleave', () => {
+      magicCursor.style.transform = 'translate(-50%, -50%) scale(1)';
+      magicCursor.style.background = '#00ff9d';
+    });
+  });
+}
+
+function createMagicParticle(x, y) {
+  const particle = document.createElement('div');
+  particle.className = 'magic-particle';
+  const colors = ['#00ff9d', '#00d4ff', '#b829dd', '#ff6b9d', '#ffd93d'];
+  const randomColor = colors[Math.floor(Math.random() * colors.length)];
+
+  particle.style.left = x + 'px';
+  particle.style.top = y + 'px';
+  particle.style.background = randomColor;
+  particle.style.boxShadow = `0 0 8px ${randomColor}`;
+
+  document.body.appendChild(particle);
+  setTimeout(() => particle.remove(), 600);
+}
+
+function renderBooks() {
+  const grid = document.getElementById('books-grid');
+  grid.innerHTML = '';
+
+  const filtered = books.filter(b => currentCategoryFilter === 'all' || b.category === currentCategoryFilter);
+
+  filtered.forEach(book => {
+    const card = document.createElement('div');
+    card.className = 'book-card glass-kids p-5 flex flex-col justify-between';
+    card.innerHTML = `
+      <div class="relative rounded-xl overflow-hidden mb-4 aspect-[3/4] bg-black/20 no-download">
+        <img src="${book.cover}" alt="${book.title}" class="w-full h-full object-cover">
+        <div class="absolute top-3 left-3">
+          <span class="age-badge age-${book.age.replace('-','')}">${book.age} years</span>
+        </div>
+      </div>
+      <div>
+        <h3 class="font-display text-lg font-bold mb-2 text-white">${book.title}</h3>
+        <p class="text-white/50 text-xs font-body mb-4 line-clamp-2">${book.description}</p>
+      </div>
+      <div class="flex items-center justify-between mt-auto pt-2">
+        <span class="font-display text-xl font-extrabold text-[#00ff9d]">$${book.price.toFixed(2)}</span>
+        <div class="flex gap-2">
+          <button onclick="previewBook('${book.id}')" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold text-white/80 transition-colors">Preview</button>
+          <button onclick="addToCart('${book.id}', event)" class="px-4 py-2 rounded-xl bg-gradient-to-r from-[#00d4ff] to-[#b829dd] text-xs font-bold text-white transition-all shadow-lg hover:brightness-110">Add</button>
+        </div>
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+
+  bindCursorInteractions();
+}
+
+function filterBooks(cat) {
+  currentCategoryFilter = cat;
+  renderBooks();
+}
+
+function addToCart(id, event) {
+  const book = books.find(b => b.id === id);
+  if(!book) return;
+
+  if(!cart.some(item => item.id === id)) {
+    cart.push(book);
+    burstParticles(event.clientX, event.clientY);
+    updateCartUI();
+  }
+}
+
+function updateCartUI() {
+  const count = document.getElementById('cart-count');
+  const itemsContainer = document.getElementById('cart-items');
+  const totalContainer = document.getElementById('cart-total');
+
+  count.innerText = cart.length;
+  count.classList.toggle('hidden', cart.length === 0);
+
+  if(cart.length === 0) {
+    itemsContainer.innerHTML = `<p class="text-white/40 text-center py-12 font-body">Your cart is empty.</p>`;
+    totalContainer.innerText = '$0.00';
+    return;
+  }
+
+  itemsContainer.innerHTML = '';
+  let total = 0;
+
+  cart.forEach(item => {
+    total += item.price;
+    const div = document.createElement('div');
+    div.className = 'flex items-center justify-between gap-4 p-3 rounded-xl bg-white/5 border border-white/5';
+    div.innerHTML = `
+      <div class="w-12 h-16 rounded overflow-hidden flex-shrink-0 bg-black/20">
+        <img src="${item.cover}" class="w-full h-full object-cover">
+      </div>
+      <div class="flex-1 min-w-0">
+        <h4 class="text-sm font-bold text-white truncate font-display">${item.title}</h4>
+        <p class="text-xs text-[#00ff9d] font-bold font-body">$${item.price.toFixed(2)}</p>
+      </div>
+      <button onclick="removeFromCart('${item.id}')" class="p-2 text-white/40 hover:text-white/80 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+      </button>
+    `;
+    itemsContainer.appendChild(div);
+  });
+
+  totalContainer.innerText = `$${total.toFixed(2)}`;
+  bindCursorInteractions();
+}
+
+function removeFromCart(id) {
+  cart = cart.filter(item => item.id !== id);
+  updateCartUI();
+}
+
+document.getElementById('cart-btn').addEventListener('click', () => {
+  document.getElementById('cart-sidebar').classList.remove('translate-x-full');
+});
+
+function closeCart() {
+  document.getElementById('cart-sidebar').classList.add('translate-x-full');
+}
+
+function burstParticles(x, y) {
+  for(let i=0; i<12; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    p.style.left = x + 'px';
+    p.style.top = y + 'px';
+    p.style.background = `hsl(${Math.random() * 360}, 100%, 70%)`;
+    const tx = (Math.random() - 0.5) * 150;
+    const ty = (Math.random() - 0.5) * 150;
+    p.style.setProperty('--tx', `${tx}px`);
+    p.style.setProperty('--ty', `${ty}px`);
+    document.body.appendChild(p);
+    setTimeout(() => p.remove(), 800);
+  }
+}
+
+async function previewBook(id) {
+  const book = books.find(b => b.id === id);
+  if(!book) return;
+
+  document.getElementById('preview-title').innerText = `Preview: ${book.title}`;
+  const body = document.getElementById('preview-body');
+  body.innerHTML = '';
+  document.getElementById('preview-modal').classList.add('active');
+
+  if(!book.pdfUrl) {
+    body.innerHTML = `
+      <div class="text-center py-12">
+        <svg class="w-16 h-16 mx-auto mb-4 text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+        <p class="font-display font-bold text-lg">No demo file linked</p>
+        <p class="text-xs text-white/40 mt-1 font-body">Add a full PDF file to generate an automatic preview.</p>
+      </div>`;
+    return;
+  }
+
+  body.innerHTML = `<p class="text-center text-sm text-white/50 py-6 animate-pulse">Loading magical pages...</p>`;
+
+  try {
+    const loadingTask = pdfjsLib.getDocument(book.pdfUrl);
+    const pdf = await loadingTask.promise;
+    body.innerHTML = '';
+
+    const maxPages = Math.min(pdf.numPages, 5);
+    for(let pageNum = 1; pageNum <= maxPages; pageNum++) {
+      const page = await pdf.getPage(pageNum);
+      const viewport = page.getViewport({ scale: 1.5 });
+
+      const canvas = document.createElement('canvas');
+      canvas.className = 'pdf-page-canvas';
+      const ctx = canvas.getContext('2d');
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
+
+      await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+
+      const pageNumText = document.createElement('p');
+      pageNumText.className = 'pdf-page-number';
+      pageNumText.innerText = `Page ${pageNum} of ${pdf.numPages}`;
+
+      body.appendChild(canvas);
+      body.appendChild(pageNumText);
+    }
+  } catch (error) {
+    console.error(error);
+    body.innerHTML = `<p class="text-center text-red-400 text-sm py-6">Unable to load preview for this document.</p>`;
+  }
+}
+
+function closePreview() {
+  document.getElementById('preview-modal').classList.remove('active');
+}
+
+document.getElementById('preview-modal').addEventListener('contextmenu', e => e.preventDefault());
+
+function showPage(pageId) {
+  document.getElementById('page-home').classList.toggle('hidden', pageId !== 'home');
+  document.getElementById('page-library').classList.toggle('hidden', pageId !== 'library');
+  document.getElementById('page-admin').classList.toggle('hidden', pageId !== 'admin');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function showLibrary() {
+  showPage('library');
+  const grid = document.getElementById('library-grid');
+  grid.innerHTML = '';
+
+  books.slice(0, 2).forEach(book => {
+    const card = document.createElement('div');
+    card.className = 'library-book-card p-4 flex flex-col gap-3';
+    card.innerHTML = `
+      <img src="${book.cover}" class="library-book-cover bg-black/20">
+      <h4 class="font-display font-bold text-sm truncate">${book.title}</h4>
+      <div class="space-y-1">
+        <div class="flex justify-between text-[10px] text-white/40 font-body">
+          <span>Reading</span>
+          <span>45%</span>
+        </div>
+        <div class="library-progress-bar"><div class="library-progress-fill" style="width: 45%"></div></div>
+      </div>
+      <button onclick="previewBook('${book.id}')" class="w-full py-2 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold font-display transition-colors">Open PDF</button>
+    `;
+    grid.appendChild(card);
+  });
+  bindCursorInteractions();
+}
+
+function initPayPalCheckout() {
+  alert("Redirecting to secure PayPal payment interface...");
+}
+
+function createStars() {
+  const container = document.getElementById('stars-container');
+  const count = 60;
+  for (let i = 0; i < count; i++) {
+    const star = document.createElement('div');
+    star.className = 'star';
+    star.style.left = `${Math.random() * 100}%`;
+    star.style.top = `${Math.random() * 100}%`;
+    star.style.animationDelay = `${Math.random() * 3}s`;
+    container.appendChild(star);
+  }
+}
+
+function handleScroll() {
+  const navbar = document.getElementById('navbar');
+  if (window.scrollY > 30) {
+    navbar.classList.add('glass-kids-strong');
+  } else {
+    navbar.classList.remove('glass-kids-strong');
+  }
+}
+
+function initAnimations() {
+  gsap.registerPlugin(ScrollTrigger);
+  gsap.utils.toArray('.reveal-kids').forEach((element) => {
+    gsap.to(element, {
+      scrollTrigger: {
+        trigger: element,
+        start: 'top 85%',
+        toggleActions: 'play none none none',
+      },
+      opacity: 1,
+      y: 0,
+      duration: 0.8,
+      ease: 'power3.out',
+    });
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(() => {
+    const loader = document.getElementById('loader');
+    loader.style.opacity = '0';
+    loader.style.visibility = 'hidden';
+  }, 1500);
+
+  createStars();
+  renderBooks();
+  window.addEventListener('scroll', handleScroll);
+  setTimeout(initAnimations, 100);
+
+  // Secret admin shortcut: Ctrl + Shift + A
+  document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && e.shiftKey && e.key === 'A') {
+      e.preventDefault();
+      showPage('admin');
+    }
+  });
+});
+
+document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+  anchor.addEventListener('click', function(e) {
+    const href = this.getAttribute('href');
+    if(href.startsWith('#') && href.length > 1) {
+      e.preventDefault();
+      showPage('home');
+      const target = document.querySelector(href);
+      if(target) target.scrollIntoView({ behavior: 'smooth' });
+    }
+  });
+});
+
+function updateUploadLabel(input) {
+  if(input.files && input.files[0]) {
+    input.parentElement.querySelector('span').innerText = input.files[0].name;
+    input.parentElement.style.borderColor = 'var(--aurora-blue)';
+  }
+}
+
+function handleBookSubmit(e) {
+  e.preventDefault();
+
+  const title = document.getElementById('book-title').value;
+  const price = parseFloat(document.getElementById('book-price').value);
+  const age = document.getElementById('book-age').value;
+  const category = document.getElementById('book-category').value;
+  const desc = document.getElementById('book-desc').value;
+
+  const coverFile = document.getElementById('file-cover').files[0];
+  const pdfFile = document.getElementById('file-pdf').files[0];
+
+  if(!coverFile) { alert('Please add a cover image.'); return; }
+
+  const newBook = {
+    id: 'custom-' + Date.now(),
+    title: title,
+    description: desc,
+    price: price,
+    age: age,
+    category: category,
+    cover: '',
+    pdfUrl: ''
+  };
+
+  const readerCover = new FileReader();
+  readerCover.onload = function(evt) {
+    newBook.cover = evt.target.result;
+
+    if(pdfFile) {
+      const readerPdf = new FileReader();
+      readerPdf.onload = function(pdfEvt) {
+        newBook.pdfUrl = pdfEvt.target.result;
+        finalizeBookCreation(newBook);
+      };
+      readerPdf.readAsDataURL(pdfFile);
+    } else {
+      finalizeBookCreation(newBook);
+    }
+  };
+  readerCover.readAsDataURL(coverFile);
+}
+
+function finalizeBookCreation(book) {
+  books.unshift(book);
+  localStorage.setItem('rainbow_reader_books', JSON.stringify(books));
+
+  document.getElementById('add-book-form').reset();
+  document.querySelectorAll('.upload-zone span').forEach(s => s.innerText = 'Choose file');
+  document.querySelectorAll('.upload-zone').forEach(z => z.style.borderColor = '');
+
+  showPage('home');
+  renderBooks();
+}
+</script>
+</body>
+</html>
